@@ -56,7 +56,10 @@ public class SteeringBehavior : MonoBehaviour
     public void SetPath(List<Vector3> path)
     {
         this.path = path;
-        this.target = path[0];
+        if (this.path != null)
+        {
+            this.target = path[0];
+        }
     }
 
     public void SetMap(List<Wall> outline)
