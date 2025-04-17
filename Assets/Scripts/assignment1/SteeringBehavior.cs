@@ -38,7 +38,6 @@ public class SteeringBehavior : MonoBehaviour
         label.text = dist.ToString() + " ";
         kinematic.SetDesiredSpeed(kinematic.GetMaxSpeed());
 
-
         // trying to get the car to have a tighter turn radius when close to the target
         // and to slow down when close to the target
         if (dist < 25 && this.target != null)
