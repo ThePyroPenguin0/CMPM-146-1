@@ -36,16 +36,16 @@ public class SteeringBehavior : MonoBehaviour
         // figure out the desired speed and rotational velocity
         float dist = direction.magnitude;
         label.text = dist.ToString() + " ";
-        kinematic.SetDesiredSpeed(kinematic.GetMaxSpeed());
 
         // trying to get the car to have a tighter turn radius when close to the target
         // and to slow down when close to the target
-        if (dist < 25 && this.target != null)
-        {
-            kinematic.SetDesiredSpeed(kinematic.GetMaxSpeed() * (dist / 25));
-        }
+        if (dist <= 3) kinematic.SetDesiredSpeed(0);
+        else if (dist < 25 && dist > 3) kinematic.SetDesiredSpeed(kinematic.GetMaxSpeed() * (dist / 25));
+        else kinematic.SetDesiredSpeed(kinematic.GetMaxSpeed());
 
-        kinematic.SetDesiredRotationalVelocity(angle * 10);
+        if(angle < 22.5f && angle > -22.5f) kinematic.SetDesiredRotationalVelocity(0);
+        else kinematic.SetDesiredRotationalVelocity(angle * 10);
+        
 
 
 
@@ -63,14 +63,6 @@ public class SteeringBehavior : MonoBehaviour
                     this.path = null;
                 }
             }
-        }
-
-        // brings the car to a stop when close enough to the target
-        // Not smooth, just here to make sure it stops
-        if (dist < 1)
-        {
-            kinematic.SetDesiredSpeed(0);
-            kinematic.SetDesiredRotationalVelocity(0);
         }
     }
 
