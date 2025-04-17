@@ -58,7 +58,7 @@ public class KinematicBehavior : MonoBehaviour
             else
             {
                 float rot = Mathf.Clamp(rotational_velocity, -nonholonomic_factor * speed, nonholonomic_factor * speed);
-                if (Mathf.Abs(rot) > 0.01f)
+                if (Mathf.Abs(rot) > 0.1f)
                 {
                     transform.Rotate(0, rot * Time.deltaTime, 0, Space.Self);
                 }
