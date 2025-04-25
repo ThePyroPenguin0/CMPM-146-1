@@ -35,7 +35,7 @@ public class SteeringBehavior : MonoBehaviour
 
         // figure out the desired speed and rotational velocity
         float dist = direction.magnitude;
-        label.text = dist.ToString() + " ";
+        // label.text = dist.ToString() + " ";
 
         // trying to get the car to have a tighter turn radius when close to the target
         // and to slow down when close to the target
