@@ -17,8 +17,76 @@ public class NavMesh : MonoBehaviour
     //    you can find neighbors by finding shared edges between
     //    different polygons (or you can keep track of this while 
     //    yo/u are splitting)
+
+    class Polygon {
+        public List<Wall> walls;
+        public (Polygon, Polygon) SplitPolygon(int a, int b) {
+            if (a > b) return SplitPolygon(b, a);
+            List<Wall> aWalls = walls.GetRange(0, a+1);
+            List<Wall> bWalls = walls.GetRange(a+1, b-a);
+            Vector3 splitPoint1 = aWalls[aWalls.Count-1].end;
+            Vector3 splitPoint2 = bWalls[bWalls.Count-1].end;
+            aWalls.Add(new Wall(splitPoint1, splitPoint2));
+            bWalls.Add(new Wall(splitPoint2, splitPoint1));
+            aWalls.AddRange(walls.GetRange(b+1, walls.Count-b-1));
+            return (new Polygon(aWalls), new Polygon(bWalls)); // TODO
+        }
+        public Polygon(List<Wall> walls)
+        {
+            this.walls = walls;
+        }
+    }
+
     public Graph MakeNavMesh(List<Wall> outline)
     {
+        // Nathan's section notes begins
+        // find the non-convex corner
+        // find the second split point
+        // split the polygon
+        // build the graph
+        List<Polygon> polygons = new List<Polygon>();
+        Polygon initPolygon = new Polygon(outline);
+        polygons.Add(initPolygon);
+
+        bool done = false;
+        int iter = 0;
+
+        while (!done) {
+            if (iter >= polygons.Count) break;
+            Polygon curr = polygons[iter];
+            int nonConvexCornerIndex = -1;
+            // find the non-convex corner
+            nonConvexCornerIndex = findNonConvexCornerIndex(curr);
+            if (nonConvexCornerIndex != -1) {
+                // find the second split point
+                int nextSplitPoint = findNextSplitPoint(curr, nonConvexCornerIndex);
+                // split the polygon
+                var (a, b) = curr.SplitPolygon(nonConvexCornerIndex, nextSplitPoint);
+                polygons.RemoveAt(iter);
+                polygons.Add(a);
+                polygons.Add(b);
+            }
+            else {
+                iter++;
+            }
+
+            if (iter == polygons.Count) done = true;
+        }
+
+
+        // build the graph
+        List<GraphNode> nodes = new List<GraphNode>();
+        int idGenerate = 0; // naive approach
+        foreach (var p in polygons) {
+            nodes.Add(new GraphNode(idGenerate, p.walls));
+            idGenerate++;
+        }
+        buildNeighbors(nodes);
+        // Graph g = new Graph();
+        // g.outline = outline;
+        // g.all_nodes = nodes;
+        // Nathan's section notes ends
+
         for (int i = 0; i < outline.Count; i++)
         {
             Wall no1 = outline[i];
@@ -37,6 +105,55 @@ public class NavMesh : MonoBehaviour
         Graph g = new Graph();
         g.all_nodes = new List<GraphNode>();
         return g;
+    }
+
+    // 
+    static void buildNeighbors(List<GraphNode> nodes) {
+        foreach (GraphNode a in nodes) {
+            foreach (GraphNode b in nodes) {
+                if (a.GetID() == b.GetID()) continue;
+                List<Wall> aWalls = a.GetPolygon();
+                List<Wall> bWalls = b.GetPolygon();
+                for (int i = 0; i < aWalls.Count; i++) {
+                    for (int j = 0; j < bWalls.Count; j++) {
+                        if (aWalls[i].Same(bWalls[j])) {
+                            a.AddNeighbor(b, i);
+                            b.AddNeighbor(a, j);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    static int findNonConvexCornerIndex(Polygon p) {
+        List<Wall> walls = p.walls;
+        for (int i = 0; i < walls.Count; i++) {
+            Wall currentWall = walls[i];
+            Wall nextWall = walls[(i + 1) % walls.Count];
+            if (Vector3.Dot(currentWall.normal, nextWall.direction) < 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static int findNextSplitPoint(Polygon p, int splitPoint) {
+        // pseudocode idea:
+        int offset = p.walls.Count / 2;
+        for (int i = 0; i < p.walls.Count; i++) {
+            int currWallIndex = (i + offset + splitPoint) %p.walls.Count;
+            if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
+            Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
+            if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
+            bool crossed = false;
+            foreach (Wall wall in p.walls) {
+                //if (wall.Crosses(p.walls[currWallIndex].end - p.walls[splitPoint].end)) crossed = true;
+                if (p.walls[currWallIndex].Crosses(p.walls[splitPoint])) crossed = true;
+            }
+            if (!crossed) return currWallIndex;
+        }
+        return -1; // TODO
     }
 
     List<Wall> outline;
