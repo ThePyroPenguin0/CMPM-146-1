@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -18,17 +19,19 @@ public class NavMesh : MonoBehaviour
     //    different polygons (or you can keep track of this while 
     //    yo/u are splitting)
 
-    class Polygon {
+    class Polygon
+    {
         public List<Wall> walls;
-        public (Polygon, Polygon) SplitPolygon(int a, int b) {
+        public (Polygon, Polygon) SplitPolygon(int a, int b)
+        {
             if (a > b) return SplitPolygon(b, a);
-            List<Wall> aWalls = walls.GetRange(0, a+1);
-            List<Wall> bWalls = walls.GetRange(a+1, b-a);
-            Vector3 splitPoint1 = aWalls[aWalls.Count-1].end;
-            Vector3 splitPoint2 = bWalls[bWalls.Count-1].end;
+            List<Wall> aWalls = walls.GetRange(0, a + 1);
+            List<Wall> bWalls = walls.GetRange(a + 1, b - a);
+            Vector3 splitPoint1 = aWalls[aWalls.Count - 1].end;
+            Vector3 splitPoint2 = bWalls[bWalls.Count - 1].end;
             aWalls.Add(new Wall(splitPoint1, splitPoint2));
             bWalls.Add(new Wall(splitPoint2, splitPoint1));
-            aWalls.AddRange(walls.GetRange(b+1, walls.Count-b-1));
+            aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
             return (new Polygon(aWalls), new Polygon(bWalls)); // TODO
         }
         public Polygon(List<Wall> walls)
@@ -37,10 +40,22 @@ public class NavMesh : MonoBehaviour
         }
     }
 
-    public Graph MakeNavMesh(List<Wall> outline)
+    public Graph MakeNavMesh(List<Wall> outline) // We actually can't use a Polygon; Polygons are formed out of the outline lmao
     {
+        List<Wall> reflexAngles = new List<Wall>();
+        for (int i = 0; i < outline.Count; i++) // Finds all reflexive angles and logs them (todo: add them to a list)
+        {
+            Wall no1 = outline[i];
+            Wall no2 = outline[(i + 1) % outline.Count];
+            if (Vector3.Dot(no1.normal, no2.direction) < 0)
+            {
+                reflexAngles.Add(no1);
+                Debug.Log($"Reflex angle found: Dot of {Vector3.Dot(no1.normal, no2.direction)}");
+            }
+        }
+
         // Nathan's section notes begins
-        // find the non-convex corner
+        // find the non-convex corner <- done on Friday, see above
         // find the second split point
         // split the polygon
         // build the graph
@@ -51,22 +66,25 @@ public class NavMesh : MonoBehaviour
         bool done = false;
         int iter = 0;
 
-        while (!done) {
+        while (!done)
+        {
             if (iter >= polygons.Count) break;
-            Polygon curr = polygons[iter];
+            Polygon currentPolygon = polygons[iter];
             int nonConvexCornerIndex = -1;
             // find the non-convex corner
-            nonConvexCornerIndex = findNonConvexCornerIndex(curr);
-            if (nonConvexCornerIndex != -1) {
+            nonConvexCornerIndex = findNonConvexCornerIndex(currentPolygon);
+            if (nonConvexCornerIndex != -1)
+            {
                 // find the second split point
-                int nextSplitPoint = findNextSplitPoint(curr, nonConvexCornerIndex);
+                int nextSplitPoint = findNextSplitPoint(currentPolygon, nonConvexCornerIndex);
                 // split the polygon
-                var (a, b) = curr.SplitPolygon(nonConvexCornerIndex, nextSplitPoint);
+                var (a, b) = currentPolygon.SplitPolygon(nonConvexCornerIndex, nextSplitPoint);
                 polygons.RemoveAt(iter);
                 polygons.Add(a);
                 polygons.Add(b);
             }
-            else {
+            else
+            {
                 iter++;
             }
 
@@ -77,7 +95,8 @@ public class NavMesh : MonoBehaviour
         // build the graph
         List<GraphNode> nodes = new List<GraphNode>();
         int idGenerate = 0; // naive approach
-        foreach (var p in polygons) {
+        foreach (var p in polygons)
+        {
             nodes.Add(new GraphNode(idGenerate, p.walls));
             idGenerate++;
         }
@@ -87,18 +106,7 @@ public class NavMesh : MonoBehaviour
         // g.all_nodes = nodes;
         // Nathan's section notes ends
 
-        for (int i = 0; i < outline.Count; i++)
-        {
-            Wall no1 = outline[i];
-            Wall no2 = outline[(i + 1) % outline.Count];
-            if(Vector3.Dot(no1.normal, no2.direction) < 0)
-            {
-                Debug.Log("found reflex angle");
-                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = no1.end;
-                sphere.transform.localScale = Vector3.one * 5;
-            }
-        }
+        
 
         // to do: implement function that links the node with a path line to the node to which would make the angle closest to 90 degrees
 
@@ -108,15 +116,21 @@ public class NavMesh : MonoBehaviour
     }
 
     // 
-    static void buildNeighbors(List<GraphNode> nodes) {
-        foreach (GraphNode a in nodes) {
-            foreach (GraphNode b in nodes) {
+    static void buildNeighbors(List<GraphNode> nodes)
+    {
+        foreach (GraphNode a in nodes)
+        {
+            foreach (GraphNode b in nodes)
+            {
                 if (a.GetID() == b.GetID()) continue;
                 List<Wall> aWalls = a.GetPolygon();
                 List<Wall> bWalls = b.GetPolygon();
-                for (int i = 0; i < aWalls.Count; i++) {
-                    for (int j = 0; j < bWalls.Count; j++) {
-                        if (aWalls[i].Same(bWalls[j])) {
+                for (int i = 0; i < aWalls.Count; i++)
+                {
+                    for (int j = 0; j < bWalls.Count; j++)
+                    {
+                        if (aWalls[i].Same(bWalls[j]))
+                        {
                             a.AddNeighbor(b, i);
                             b.AddNeighbor(a, j);
                         }
@@ -126,34 +140,45 @@ public class NavMesh : MonoBehaviour
         }
     }
 
-    static int findNonConvexCornerIndex(Polygon p) {
+    static int findNonConvexCornerIndex(Polygon p)
+    {
         List<Wall> walls = p.walls;
-        for (int i = 0; i < walls.Count; i++) {
+        for (int i = 0; i < walls.Count; i++)
+        {
             Wall currentWall = walls[i];
             Wall nextWall = walls[(i + 1) % walls.Count];
-            if (Vector3.Dot(currentWall.normal, nextWall.direction) < 0) {
+            if (Vector3.Dot(currentWall.normal, nextWall.direction) < 0)
+            {
                 return i;
             }
         }
         return -1;
     }
 
-    static int findNextSplitPoint(Polygon p, int splitPoint) {
-        // pseudocode idea:
-        int offset = p.walls.Count / 2;
-        for (int i = 0; i < p.walls.Count; i++) {
-            int currWallIndex = (i + offset + splitPoint) %p.walls.Count;
-            if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
-            Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
-            if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
-            bool crossed = false;
-            foreach (Wall wall in p.walls) {
-                //if (wall.Crosses(p.walls[currWallIndex].end - p.walls[splitPoint].end)) crossed = true;
-                if (p.walls[currWallIndex].Crosses(p.walls[splitPoint])) crossed = true;
+    static int findNextSplitPoint(Polygon p, int splitPoint)
+    {
+        if (p.walls.Count >= 3)
+        {
+            // pseudocode idea: ("Idea" lmao, this is literally the function)
+            int offset = p.walls.Count / 2;
+            for (int i = 0; i < p.walls.Count; i++)
+            {
+                int currWallIndex = (i + offset + splitPoint) % p.walls.Count;
+                if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
+                Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
+                if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
+                bool crossed = false;
+                foreach (Wall wall in p.walls)
+                {
+                    crossed = (wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end)) &&
+                              (p.walls[currWallIndex].Crosses(p.walls[splitPoint])); // What exactly does this mean? The dementia might be setting in but I don't get it
+                    if (crossed) break;
+
+                }
+                if (!crossed) return currWallIndex;
             }
-            if (!crossed) return currWallIndex;
         }
-        return -1; // TODO
+        return -1; // TODO (Why? Seems right that we return an invalid value and check for it)
     }
 
     List<Wall> outline;
@@ -167,7 +192,7 @@ public class NavMesh : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-       
+
 
     }
 
@@ -181,8 +206,8 @@ public class NavMesh : MonoBehaviour
         }
     }
 
-    
 
 
-    
+
+
 }
