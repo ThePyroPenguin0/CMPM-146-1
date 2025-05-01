@@ -17,22 +17,37 @@ public class NavMesh : MonoBehaviour
     //    to convert them into a graph: each polygon is a node
     //    you can find neighbors by finding shared edges between
     //    different polygons (or you can keep track of this while 
-    //    yo/u are splitting)
+    //    you are splitting)
 
     class Polygon
     {
         public List<Wall> walls;
         public (Polygon, Polygon) SplitPolygon(int a, int b)
         {
-            if (a > b) return SplitPolygon(b, a);
+            if (a > b)
+            {
+                return SplitPolygon(b, a);
+            }
+
+            if (a < 0 || b < 0 || a >= walls.Count || b >= walls.Count || a == b)
+            {
+                throw new ArgumentException($"Error: At least one argument is invalid. Arguments: {a} and {b}. Walls: {walls.Count}");
+            }
+
             List<Wall> aWalls = walls.GetRange(0, a + 1);
             List<Wall> bWalls = walls.GetRange(a + 1, b - a);
+
             Vector3 splitPoint1 = aWalls[aWalls.Count - 1].end;
             Vector3 splitPoint2 = bWalls[bWalls.Count - 1].end;
+
             aWalls.Add(new Wall(splitPoint1, splitPoint2));
             bWalls.Add(new Wall(splitPoint2, splitPoint1));
-            aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
-            return (new Polygon(aWalls), new Polygon(bWalls)); // TODO
+
+            if (b + 1 < walls.Count) // Check added for wraparound
+            {
+                aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
+            }
+            return (new Polygon(aWalls), new Polygon(bWalls)); // TODO (Why? This seems to be what we need)
         }
         public Polygon(List<Wall> walls)
         {
@@ -201,13 +216,8 @@ public class NavMesh : MonoBehaviour
         Graph navmesh = MakeNavMesh(outline);
         if (navmesh != null)
         {
-            Debug.Log("got navmesh: " + navmesh.all_nodes.Count);
+            // Debug.Log("got navmesh: " + navmesh.all_nodes.Count);
             EventBus.SetGraph(navmesh);
         }
     }
-
-
-
-
-
 }
