@@ -126,7 +126,7 @@ public class NavMesh : MonoBehaviour
         // to do: implement function that links the node with a path line to the node to which would make the angle closest to 90 degrees
 
         Graph g = new Graph();
-        g.all_nodes = new List<GraphNode>();
+        g.all_nodes = nodes;
         return g;
     }
 
