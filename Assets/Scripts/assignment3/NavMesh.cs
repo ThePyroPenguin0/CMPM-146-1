@@ -65,7 +65,7 @@ public class NavMesh : MonoBehaviour
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
                 reflexAngles.Add(no1);
-                Debug.Log($"Reflex angle found: Dot of {Vector3.Dot(no1.normal, no2.direction)}");
+                //Debug.Log($"Reflex angle found: Dot of {Vector3.Dot(no1.normal, no2.direction)}");
             }
         }
 
@@ -85,19 +85,33 @@ public class NavMesh : MonoBehaviour
         {
             if (iter >= polygons.Count) break;
             Polygon currentPolygon = polygons[iter];
-            int nonConvexCornerIndex = -1;
+            //int nonConvexCornerIndex = -1;
+            bool containsReflexAngle = currentPolygon.walls.Any(wall => reflexAngles.Contains(wall));
+            if (!containsReflexAngle)
+            {
+                iter++;
+                continue;
+            }
             // find the non-convex corner
-            nonConvexCornerIndex = findNonConvexCornerIndex(currentPolygon);
+            int nonConvexCornerIndex = findNonConvexCornerIndex(currentPolygon);
             if (nonConvexCornerIndex != -1)
             {
                 // find the second split point
                 int nextSplitPoint = findNextSplitPoint(currentPolygon, nonConvexCornerIndex);
+                if (nextSplitPoint == -1)
+                {
+                    Debug.Log($"No next split point found, skipping polygon {iter}.");
+                    iter++;
+                    continue;
+                }
+
                 // split the polygon
                 var (a, b) = currentPolygon.SplitPolygon(nonConvexCornerIndex, nextSplitPoint);
                 polygons.RemoveAt(iter);
-                polygons.Add(a);
-                polygons.Add(b);
+                polygons.Insert(iter, b);
+                polygons.Insert(iter, a);
             }
+
             else
             {
                 iter++;
@@ -167,6 +181,7 @@ public class NavMesh : MonoBehaviour
                 return i;
             }
         }
+        Debug.Log("findNonConvexCornerIndex returned -1");
         return -1;
     }
 
@@ -176,6 +191,7 @@ public class NavMesh : MonoBehaviour
         {
             // pseudocode idea: ("Idea" lmao, this is literally the function)
             int offset = p.walls.Count / 2;
+            Debug.Log($"Split point: {splitPoint}, Count: {p.walls.Count}, Offset: {offset}");
             for (int i = 0; i < p.walls.Count; i++)
             {
                 int currWallIndex = (i + offset + splitPoint) % p.walls.Count;
@@ -193,6 +209,7 @@ public class NavMesh : MonoBehaviour
                 if (!crossed) return currWallIndex;
             }
         }
+        Debug.Log("findNextSplitPoint returned -1");
         return -1; // TODO (Why? Seems right that we return an invalid value and check for it)
     }
 
