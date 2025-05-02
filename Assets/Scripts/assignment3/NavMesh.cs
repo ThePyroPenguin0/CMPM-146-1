@@ -22,16 +22,11 @@ public class NavMesh : MonoBehaviour
     class Polygon
     {
         public List<Wall> walls;
-        public (Polygon, Polygon) SplitPolygon(int a, int b)
+        public (Polygon, Polygon) SplitPolygon(int a, int b, List<Wall> outline)
         {
             if (a > b)
             {
-                return SplitPolygon(b, a);
-            }
-
-            if (a < 0 || b < 0 || a >= walls.Count || b >= walls.Count || a == b)
-            {
-                throw new ArgumentException($"Error: At least one argument is invalid. Arguments: {a} and {b}. Walls: {walls.Count}");
+                return SplitPolygon(b, a, outline);
             }
 
             List<Wall> aWalls = walls.GetRange(0, a + 1);
@@ -39,7 +34,7 @@ public class NavMesh : MonoBehaviour
 
             Vector3 splitPoint1 = aWalls[aWalls.Count - 1].end;
             Vector3 splitPoint2 = bWalls[bWalls.Count - 1].end;
-
+            
             aWalls.Add(new Wall(splitPoint1, splitPoint2));
             bWalls.Add(new Wall(splitPoint2, splitPoint1));
 
@@ -64,11 +59,14 @@ public class NavMesh : MonoBehaviour
             Wall no2 = outline[(i + 1) % outline.Count];
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
-                reflexAngles.Add(no1);
+                reflexAngles.Add(no2);
+                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.transform.position = no1.end;
+                sphere.transform.localScale *= 5;
                 //Debug.Log($"Reflex angle found: Dot of {Vector3.Dot(no1.normal, no2.direction)}");
             }
         }
-
+        Debug.Log($"Reflex angles: {reflexAngles.Count}");
         // Nathan's section notes begins
         // find the non-convex corner <- done on Friday, see above
         // find the second split point
@@ -106,12 +104,11 @@ public class NavMesh : MonoBehaviour
                 }
 
                 // split the polygon
-                var (a, b) = currentPolygon.SplitPolygon(nonConvexCornerIndex, nextSplitPoint);
+                var (a, b) = currentPolygon.SplitPolygon(nonConvexCornerIndex, nextSplitPoint, outline);
                 polygons.RemoveAt(iter);
                 polygons.Insert(iter, b);
                 polygons.Insert(iter, a);
             }
-
             else
             {
                 iter++;
@@ -237,4 +234,29 @@ public class NavMesh : MonoBehaviour
             EventBus.SetGraph(navmesh);
         }
     }
+
+    private bool IsPointInPolygon(Vector3 point, List<Wall> polygon)
+{
+    int intersections = 0;
+    for (int i = 0; i < polygon.Count; i++)
+    {
+        Vector3 start = polygon[i].start;
+        Vector3 end = polygon[i].end;
+
+        // Check if the point is on the same z-plane as the edge
+        if ((start.z > point.z) != (end.z > point.z))
+        {
+            float t = (point.z - start.z) / (end.z - start.z);
+            float xIntersection = start.x + t * (end.x - start.x);
+
+            if (point.x < xIntersection)
+            {
+                intersections++;
+            }
+        }
+    }
+
+    // Point is inside the polygon if the number of intersections is odd
+    return (intersections % 2) == 1;
+}
 }
