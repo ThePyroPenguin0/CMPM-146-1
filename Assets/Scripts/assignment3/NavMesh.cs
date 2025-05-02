@@ -57,6 +57,7 @@ public class NavMesh : MonoBehaviour
     public Graph MakeNavMesh(List<Wall> outline) // We actually can't use a Polygon; Polygons are formed out of the outline lmao
     {
         List<Wall> reflexAngles = new List<Wall>();
+        
         for (int i = 0; i < outline.Count; i++) // Finds all reflexive angles and logs them (todo: add them to a list)
         {
             Wall no1 = outline[i];
@@ -64,13 +65,8 @@ public class NavMesh : MonoBehaviour
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
                 reflexAngles.Add(no2);
-                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = no1.end;
-                sphere.transform.localScale *= 5;
-                //Debug.Log($"Reflex angle found: Dot of {Vector3.Dot(no1.normal, no2.direction)}");
             }
         }
-        //Debug.Log($"Reflex angles: {reflexAngles.Count}");
         // Nathan's section notes begins
         // find the non-convex corner <- done on Friday, see above
         // find the second split point
@@ -89,12 +85,12 @@ public class NavMesh : MonoBehaviour
             if (iter >= polygons.Count) break;
             Polygon currentPolygon = polygons[iter];
             //int nonConvexCornerIndex = -1;
-            bool containsReflexAngle = currentPolygon.walls.Any(wall => reflexAngles.Contains(wall));
-            if (!containsReflexAngle)
-            {
-                iter++;
-                continue;
-            }
+            //bool containsReflexAngle = currentPolygon.walls.Any(wall => reflexAngles.Contains(wall));
+            //if (!containsReflexAngle)
+            //{
+            //    iter++;
+            //    continue;
+            //}
             // find the non-convex corner
             int nonConvexCornerIndex = findNonConvexCornerIndex(currentPolygon);
             if (nonConvexCornerIndex != -1)
@@ -103,7 +99,7 @@ public class NavMesh : MonoBehaviour
                 int nextSplitPoint = findNextSplitPoint(currentPolygon, nonConvexCornerIndex);
                 if (nextSplitPoint == -1)
                 {
-                    //Debug.Log($"No next split point found, skipping polygon {iter}.");
+                    Debug.Log($"No next split point found, skipping polygon {iter}.");
                     iter++;
                     continue;
                 }
@@ -119,14 +115,10 @@ public class NavMesh : MonoBehaviour
                 iter++;
             }
 
-            if (iter == polygons.Count) done = true;
+            //if (iter == polygons.Count) done = true;
         }
 
-        for(int i = 0; i < reflexAngles.Count; i++)
-        { 
-            Debug.Log($"Reflex angle {i}: {reflexAngles[i].start} -> {reflexAngles[i].end}");
-        }
-
+        Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
         // build the graph
         List<GraphNode> nodes = new List<GraphNode>();
         int idGenerate = 0; // naive approach
@@ -141,7 +133,7 @@ public class NavMesh : MonoBehaviour
         // g.all_nodes = nodes;
         // Nathan's section notes ends
 
-        
+
 
         // to do: implement function that links the node with a path line to the node to which would make the angle closest to 90 degrees
 
@@ -195,28 +187,40 @@ public class NavMesh : MonoBehaviour
     {
         if (p.walls.Count >= 3)
         {
-            // pseudocode idea: ("Idea" lmao, this is literally the function)
+            int maxAttempts = p.walls.Count; // Limit the number of attempts to avoid infinite loops
+            int attempt = 0;
             int offset = p.walls.Count / 2;
-            //Debug.Log($"Split point: {splitPoint}, Count: {p.walls.Count}, Offset: {offset}");
-            for (int i = 0; i < p.walls.Count; i++)
-            {
-                int currWallIndex = (i + offset + splitPoint) % p.walls.Count;
-                if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
-                Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
-                if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
-                bool crossed = false;
-                foreach (Wall wall in p.walls)
-                {
-                    crossed = (wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end)) &&
-                              (p.walls[currWallIndex].Crosses(p.walls[splitPoint])); // What exactly does this mean? The dementia might be setting in but I don't get it
-                    if (crossed) break;
 
+            while (attempt < maxAttempts)
+            {
+                Debug.Log($"Attempt {attempt + 1}: Split point: {splitPoint}, Count: {p.walls.Count}, Offset: {offset}");
+                for (int i = 0; i < p.walls.Count; i++)
+                {
+                    int currWallIndex = (i + offset + splitPoint) % p.walls.Count;
+                    if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
+
+                    Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
+                    if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
+
+                    bool crossed = false;
+                    foreach (Wall wall in p.walls)
+                    {
+                        crossed = (wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end)) && // Exclude current wall, current wall + 1, end splitpoint, and end splitpoint + 1
+                                  (p.walls[currWallIndex].Crosses(p.walls[splitPoint]));
+                        if (crossed) break;
+                    }
+
+                    if (!crossed) return currWallIndex;
                 }
-                if (!crossed) return currWallIndex;
+
+                // Adjust offset or search criteria for the next attempt
+                offset = (offset + 1) % p.walls.Count;
+                attempt++;
             }
         }
-        //Debug.Log("findNextSplitPoint returned -1");
-        return -1; // TODO (Why? Seems right that we return an invalid value and check for it)
+
+        Debug.Log("findNextSplitPoint returned -1 after exhausting all attempts");
+        return -1; // Return -1 if no valid split point is found after all attempts
     }
 
     List<Wall> outline;
@@ -243,29 +247,4 @@ public class NavMesh : MonoBehaviour
             EventBus.SetGraph(navmesh);
         }
     }
-
-    private bool IsPointInPolygon(Vector3 point, List<Wall> polygon)
-{
-    int intersections = 0;
-    for (int i = 0; i < polygon.Count; i++)
-    {
-        Vector3 start = polygon[i].start;
-        Vector3 end = polygon[i].end;
-
-        // Check if the point is on the same z-plane as the edge
-        if ((start.z > point.z) != (end.z > point.z))
-        {
-            float t = (point.z - start.z) / (end.z - start.z);
-            float xIntersection = start.x + t * (end.x - start.x);
-
-            if (point.x < xIntersection)
-            {
-                intersections++;
-            }
-        }
-    }
-
-    // Point is inside the polygon if the number of intersections is odd
-    return (intersections % 2) == 1;
-}
 }
