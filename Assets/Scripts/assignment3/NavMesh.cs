@@ -208,11 +208,14 @@ public class NavMesh : MonoBehaviour
                     bool crossed = false;
                     foreach (Wall wall in p.walls)
                     {
-                        crossed = (wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end)) && // Exclude current wall, current wall + 1, end splitpoint, and end splitpoint + 1
-                                  (p.walls[currWallIndex].Crosses(p.walls[splitPoint]));
+                        if (wall == p.walls[currWallIndex] || wall == p.walls[splitPoint]) continue;
+
+                        int wallIndex = p.walls.IndexOf(wall);
+                        if (wallIndex == (currWallIndex + 1) % p.walls.Count || wallIndex == (splitPoint + 1) % p.walls.Count) continue;
+
+                        crossed = wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end);
                         if (crossed) break;
                     }
-
                     if (!crossed) return currWallIndex;
                 }
 
