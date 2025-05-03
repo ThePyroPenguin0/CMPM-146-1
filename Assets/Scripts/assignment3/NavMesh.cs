@@ -65,6 +65,9 @@ public class NavMesh : MonoBehaviour
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
                 reflexAngles.Add(no2);
+                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.transform.position = no2.start;
+                sphere.transform.localScale *= 5;
             }
         }
         // Nathan's section notes begins
