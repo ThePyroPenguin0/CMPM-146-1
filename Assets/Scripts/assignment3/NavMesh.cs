@@ -46,7 +46,7 @@ public class NavMesh : MonoBehaviour
                     aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
                 }
             }
-            return (new Polygon(aWalls), new Polygon(bWalls)); // TODO (Why? This seems to be what we need)
+            return (new Polygon(aWalls), new Polygon(bWalls));
         }
         public Polygon(List<Wall> walls)
         {
@@ -65,17 +65,13 @@ public class NavMesh : MonoBehaviour
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
                 reflexAngles.Add(no2);
-                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = no2.start;
-                sphere.transform.localScale *= 5;
             }
         }
-        // Nathan's section notes begins
+
         // find the non-convex corner <- done on Friday, see above
         // find the second split point
         // split the polygon
         // build the graph
-        List<Wall> missedAngles = new List<Wall>();
         List<Polygon> polygons = new List<Polygon>();
         Polygon initPolygon = new Polygon(outline);
         polygons.Add(initPolygon);
@@ -87,19 +83,13 @@ public class NavMesh : MonoBehaviour
         {
             if (iter >= polygons.Count) break;
             Polygon currentPolygon = polygons[iter];
-            //int nonConvexCornerIndex = -1;
-            //bool containsReflexAngle = currentPolygon.walls.Any(wall => reflexAngles.Contains(wall));
-            //if (!containsReflexAngle)
-            //{
-            //    iter++;
-            //    continue;
-            //}
+
             // find the non-convex corner
-            int nonConvexCornerIndex = findNonConvexCornerIndex(currentPolygon);
+            int nonConvexCornerIndex = FindNonConvexCornerIndex(currentPolygon);
             if (nonConvexCornerIndex != -1)
             {
                 // find the second split point
-                int nextSplitPoint = findNextSplitPoint(currentPolygon, nonConvexCornerIndex);
+                int nextSplitPoint = FindNextSplitPoint(currentPolygon, nonConvexCornerIndex);
                 if (nextSplitPoint == -1)
                 {
                     Debug.Log($"No next split point found, skipping polygon {iter}.");
@@ -113,12 +103,8 @@ public class NavMesh : MonoBehaviour
                 polygons.Insert(iter, b);
                 polygons.Insert(iter, a);
             }
-            else
-            {
-                iter++;
-            }
 
-            //if (iter == polygons.Count) done = true;
+            else iter++;
         }
 
         Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
@@ -130,13 +116,7 @@ public class NavMesh : MonoBehaviour
             nodes.Add(new GraphNode(idGenerate, p.walls));
             idGenerate++;
         }
-        buildNeighbors(nodes);
-        // Graph g = new Graph();
-        // g.outline = outline;
-        // g.all_nodes = nodes;
-        // Nathan's section notes ends
-
-
+        BuildNeighbors(nodes);
 
         // to do: implement function that links the node with a path line to the node to which would make the angle closest to 90 degrees
 
@@ -146,7 +126,7 @@ public class NavMesh : MonoBehaviour
     }
 
     // 
-    static void buildNeighbors(List<GraphNode> nodes)
+    static void BuildNeighbors(List<GraphNode> nodes)
     {
         foreach (GraphNode a in nodes)
         {
@@ -170,7 +150,20 @@ public class NavMesh : MonoBehaviour
         }
     }
 
-    static int findNonConvexCornerIndex(Polygon p)
+    /*
+        Finds the first non-convex corner inside of a polygon p, and returns the index that corner is found at.
+        Polygon p: the polygon containing a non-convex corner
+
+        How it should work:
+        1. Iterate through every wall in the polygon
+        2. For each wall, check if the angle between the current wall and the next wall is greater than 180 degrees.
+            if it is, then it is a non-convex corner
+            Basically, if you are going counter-clockwise around the graph and at any point you have to turn
+            left even by a tiny amount, that is a non-convex corner.
+        3. Return the first found non-convex corner
+        4. If no non-convex corners are found, return -1
+    */
+    static int FindNonConvexCornerIndex(Polygon p)
     {
         List<Wall> walls = p.walls;
         for (int i = 0; i < walls.Count; i++)
@@ -179,6 +172,10 @@ public class NavMesh : MonoBehaviour
             Wall nextWall = walls[(i + 1) % walls.Count];
             if (Vector3.Dot(currentWall.normal, nextWall.direction) < 0)
             {
+                Debug.Log($"Index {i} has dot product of {Vector3.Dot(currentWall.normal, nextWall.direction)}");
+                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.transform.position = nextWall.start;
+                sphere.transform.localScale *= 5;
                 return i;
             }
         }
@@ -186,43 +183,51 @@ public class NavMesh : MonoBehaviour
         return -1;
     }
 
-    static int findNextSplitPoint(Polygon p, int splitPoint)
+    /*
+        Finds a valid split point within the polygon, to be used in order to split the polygon
+        Polygon p: the polygon containing a non-convex corner
+        int splitPoint: the point within the polygon where the non-convex corner is found
+
+        How it should work:
+        1. Check for validity of polygon. This is simply done by making sure it has at least 3 walls i.e. at least a triangle.
+        2. Check every index within p and returns the first valid index.
+            The index is valid if:
+                  i.    It is NOT the splitPoint
+                 ii.    It is NOT the points right next to splitPoint
+                iii.    The wall that could be build between those two points does NOT intersect any other walls
+                            Note: we only need to check that it doesn't intersect the lines of p
+                 iv.    The angle created by the new wall is ideally NOT convex
+        
+        If the program does not find a valid split point (which it should NEVER do), it will return -1
+        Otherwise, returns an int which represents the index of the valid split point
+    */
+    static int FindNextSplitPoint(Polygon p, int splitPoint)
     {
         if (p.walls.Count >= 3)
         {
-            int maxAttempts = p.walls.Count; // Limit the number of attempts to avoid infinite loops
-            int attempt = 0;
             int offset = p.walls.Count / 2;
+            for (int i = 0; i < p.walls.Count; i++) {
+                int currIndex = (i + splitPoint + offset) % p.walls.Count; 
+                
+                if (Mathf.Abs(currIndex - splitPoint) < 2) continue; // i is either splitPoint or right next to the split point
 
-            while (attempt < maxAttempts)
-            {
-                Debug.Log($"Attempt {attempt + 1}: Split point: {splitPoint}, Count: {p.walls.Count}, Offset: {offset}");
-                for (int i = 0; i < p.walls.Count; i++)
+                Vector3 newVector = p.walls[currIndex].end - p.walls[splitPoint].end;
+                if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
+
+                bool crossed = false;
+                foreach (Wall wall in p.walls)
                 {
-                    int currWallIndex = (i + offset + splitPoint) % p.walls.Count;
-                    if (Mathf.Abs(currWallIndex - splitPoint) < 2) continue;
+                    if (wall.Same(p.walls[currIndex]) || wall.Same(p.walls[splitPoint])) continue;
 
-                    Vector3 newVector = p.walls[currWallIndex].end - p.walls[splitPoint].end;
-                    if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
+                    int wallIndex = p.walls.IndexOf(wall);
+                    if (wallIndex == (currIndex + 1) % p.walls.Count || wallIndex == (splitPoint + 1) % p.walls.Count) continue;
 
-                    bool crossed = false;
-                    foreach (Wall wall in p.walls)
-                    {
-                        if (wall == p.walls[currWallIndex] || wall == p.walls[splitPoint]) continue;
-
-                        int wallIndex = p.walls.IndexOf(wall);
-                        if (wallIndex == (currWallIndex + 1) % p.walls.Count || wallIndex == (splitPoint + 1) % p.walls.Count) continue;
-
-                        crossed = wall.Crosses(p.walls[currWallIndex].end, p.walls[splitPoint].end);
-                        if (crossed) break;
-                    }
-                    if (!crossed) return currWallIndex;
+                    crossed = wall.Crosses(p.walls[currIndex].end, p.walls[splitPoint].end);
+                    if (crossed) break;
                 }
-
-                // Adjust offset or search criteria for the next attempt
-                offset = (offset + 1) % p.walls.Count;
-                attempt++;
+                if (!crossed) return currIndex;
             }
+
         }
 
         Debug.Log("findNextSplitPoint returned -1 after exhausting all attempts");
