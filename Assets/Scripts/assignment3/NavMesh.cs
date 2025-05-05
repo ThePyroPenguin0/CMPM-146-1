@@ -54,17 +54,36 @@ public class NavMesh : MonoBehaviour
         }
     }
 
+    Polygon FindPolygonContainingWall(Wall targetWall, List<Polygon> polygons)
+    {
+        foreach (Polygon polygon in polygons)
+        {
+            foreach (Wall wall in polygon.walls)
+            {
+                if ((wall.start == targetWall.start && wall.end == targetWall.end) || (wall.start == targetWall.end && wall.end == targetWall.start))
+                {
+                    return polygon;
+                }
+            }
+        }
+        Debug.Log("null returned in FindPolygonContainingWall");
+        return null;
+    }
+
     public Graph MakeNavMesh(List<Wall> outline) // We actually can't use a Polygon; Polygons are formed out of the outline lmao
     {
         List<Wall> reflexAngles = new List<Wall>();
         
-        for (int i = 0; i < outline.Count; i++) // Finds all reflexive angles and logs them (todo: add them to a list)
+        for (int i = 0; i < outline.Count; i++) // Finds all reflexive angles and logs them
         {
             Wall no1 = outline[i];
             Wall no2 = outline[(i + 1) % outline.Count];
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
-                reflexAngles.Add(no2);
+                reflexAngles.Add(no1);
+                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                sphere.transform.position = no1.end;
+                sphere.transform.localScale *= 5;
             }
         }
 
@@ -73,38 +92,29 @@ public class NavMesh : MonoBehaviour
         // split the polygon
         // build the graph
         List<Polygon> polygons = new List<Polygon>();
-        Polygon initPolygon = new Polygon(outline);
-        polygons.Add(initPolygon);
+        //Polygon initPolygon = new Polygon(outline);
+        Polygon currPolygon = new Polygon(outline);
 
-        bool done = false;
-        int iter = 0;
-
-        while (!done)
+        foreach (Wall rAngle in reflexAngles)
         {
-            if (iter >= polygons.Count) break;
-            Polygon currentPolygon = polygons[iter];
-
-            // find the non-convex corner
-            int nonConvexCornerIndex = FindNonConvexCornerIndex(currentPolygon);
-            if (nonConvexCornerIndex != -1)
+            // iterate through every wall in a polygon using the wall.same method to find which polygon an rAngle belongs to
+            int index = outline.IndexOf(rAngle);
+            if (index > -1)
             {
-                // find the second split point
-                int nextSplitPoint = FindNextSplitPoint(currentPolygon, nonConvexCornerIndex);
-                if (nextSplitPoint == -1)
-                {
-                    Debug.Log($"No next split point found, skipping polygon {iter}.");
-                    iter++;
-                    continue;
+                Polygon findPoly = FindPolygonContainingWall(rAngle, polygons);
+                if (findPoly != null) currPolygon = findPoly;
+                index = currPolygon.walls.IndexOf(rAngle);
+                if (index > -1) {
+                    int nextSplitPoint = FindNextSplitPoint(currPolygon, index);
+                    if (nextSplitPoint != -1)
+                    {
+                        var (a, b) = currPolygon.SplitPolygon(index, nextSplitPoint, currPolygon.walls);
+                        polygons.Remove(currPolygon);
+                        polygons.Add(a);
+                        polygons.Add(b);
+                    }
                 }
-
-                // split the polygon
-                var (a, b) = currentPolygon.SplitPolygon(nonConvexCornerIndex, nextSplitPoint, outline);
-                polygons.RemoveAt(iter);
-                polygons.Insert(iter, b);
-                polygons.Insert(iter, a);
             }
-
-            else iter++;
         }
 
         Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
@@ -117,8 +127,6 @@ public class NavMesh : MonoBehaviour
             idGenerate++;
         }
         BuildNeighbors(nodes);
-
-        // to do: implement function that links the node with a path line to the node to which would make the angle closest to 90 degrees
 
         Graph g = new Graph();
         g.all_nodes = nodes;
@@ -211,6 +219,8 @@ public class NavMesh : MonoBehaviour
                 
                 if (Mathf.Abs(currIndex - splitPoint) < 2) continue; // i is either splitPoint or right next to the split point
 
+                Debug.Log($"currIndex = {currIndex}");
+                Debug.Log($"splitPoint = {splitPoint}");
                 Vector3 newVector = p.walls[currIndex].end - p.walls[splitPoint].end;
                 if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
 
