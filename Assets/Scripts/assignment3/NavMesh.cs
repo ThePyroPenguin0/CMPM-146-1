@@ -37,14 +37,11 @@ public class NavMesh : MonoBehaviour
 
             Wall splittingWall = new Wall(splitPoint1, splitPoint2);
 
-            if (Util.PointInPolygon(splittingWall.midpoint, walls))
+            aWalls.Add(new Wall(splitPoint1, splitPoint2));
+            bWalls.Add(new Wall(splitPoint2, splitPoint1));
+            if (b + 1 < walls.Count) // Check added for wraparound
             {
-                aWalls.Add(new Wall(splitPoint1, splitPoint2));
-                bWalls.Add(new Wall(splitPoint2, splitPoint1));
-                if (b + 1 < walls.Count) // Check added for wraparound
-                {
-                    aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
-                }
+                aWalls.AddRange(walls.GetRange(b + 1, walls.Count - b - 1));
             }
             return (new Polygon(aWalls), new Polygon(bWalls));
         }
@@ -81,9 +78,6 @@ public class NavMesh : MonoBehaviour
             if (Vector3.Dot(no1.normal, no2.direction) < 0)
             {
                 reflexAngles.Add(no1);
-                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = no1.end;
-                sphere.transform.localScale *= 5;
             }
         }
 
