@@ -26,7 +26,10 @@ public class Wall
 
     public bool Crosses(Vector3 from, Vector3 to)
     {
-        
+        if (length > (to-from).magnitude)
+        {
+            return new Wall(from, to).Crosses(this);
+        }
 
         Vector3 d1 = from - this.start;
         Vector3 d2 = to - this.start;
@@ -56,7 +59,6 @@ public class Wall
             return false;
         }
 
-       
 
         if (dist1 * dist2 > 0) return false;
         // if the start and end are on different sides, we need to determine 
@@ -70,7 +72,7 @@ public class Wall
         // is proportional to the normal distance of `from`  
         // along the total movement (one of dist1 and dist2 is negative!)
         float t = dist1 / (dist1 - dist2);
-
+        
         // calculate the intersection as this proportion
         float intersection = ldist1 + t * (ldist2 - ldist1);
         if (intersection < 0 || intersection > length) return false;

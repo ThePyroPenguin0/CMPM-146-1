@@ -153,39 +153,6 @@ public class NavMesh : MonoBehaviour
     }
 
     /*
-        Finds the first non-convex corner inside of a polygon p, and returns the index that corner is found at.
-        Polygon p: the polygon containing a non-convex corner
-
-        How it should work:
-        1. Iterate through every wall in the polygon
-        2. For each wall, check if the angle between the current wall and the next wall is greater than 180 degrees.
-            if it is, then it is a non-convex corner
-            Basically, if you are going counter-clockwise around the graph and at any point you have to turn
-            left even by a tiny amount, that is a non-convex corner.
-        3. Return the first found non-convex corner
-        4. If no non-convex corners are found, return -1
-    */
-    static int FindNonConvexCornerIndex(Polygon p)
-    {
-        List<Wall> walls = p.walls;
-        for (int i = 0; i < walls.Count; i++)
-        {
-            Wall currentWall = walls[i];
-            Wall nextWall = walls[(i + 1) % walls.Count];
-            if (Vector3.Dot(currentWall.normal, nextWall.direction) < 0)
-            {
-                Debug.Log($"Index {i} has dot product of {Vector3.Dot(currentWall.normal, nextWall.direction)}");
-                GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                sphere.transform.position = nextWall.start;
-                sphere.transform.localScale *= 5;
-                return i;
-            }
-        }
-        //Debug.Log("findNonConvexCornerIndex returned -1");
-        return -1;
-    }
-
-    /*
         Finds a valid split point within the polygon, to be used in order to split the polygon
         Polygon p: the polygon containing a non-convex corner
         int splitPoint: the point within the polygon where the non-convex corner is found
@@ -213,8 +180,6 @@ public class NavMesh : MonoBehaviour
                 
                 if (Mathf.Abs(currIndex - splitPoint) < 2) continue; // i is either splitPoint or right next to the split point
 
-                Debug.Log($"currIndex = {currIndex}");
-                Debug.Log($"splitPoint = {splitPoint}");
                 Vector3 newVector = p.walls[currIndex].end - p.walls[splitPoint].end;
                 if (Vector3.Dot(p.walls[splitPoint].normal, newVector) < 0) continue;
 
@@ -226,7 +191,7 @@ public class NavMesh : MonoBehaviour
                     int wallIndex = p.walls.IndexOf(wall);
                     if (wallIndex == (currIndex + 1) % p.walls.Count || wallIndex == (splitPoint + 1) % p.walls.Count) continue;
 
-                    crossed = wall.Crosses(p.walls[currIndex].end, p.walls[splitPoint].end);
+                    crossed = wall.Crosses(p.walls[currIndex].end, p.walls[splitPoint].end) || p.walls[currIndex].Crosses(p.walls[splitPoint]);
                     if (crossed) break;
                 }
                 if (!crossed) return currIndex;
