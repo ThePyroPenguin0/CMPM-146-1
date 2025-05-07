@@ -92,7 +92,7 @@ public class NavMesh : MonoBehaviour
                     }
                     else
                     {
-                        generatedPolygons.Add(currentPolygon); // Now, if there is no valid split point, it's actually okay
+                        generatedPolygons.Add(currentPolygon);
                     }
                 }
                 else
@@ -102,7 +102,7 @@ public class NavMesh : MonoBehaviour
             }
             polygons = generatedPolygons;
         }
-        Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
+        //Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
         
         // build the graph
         List<GraphNode> nodes = new List<GraphNode>();
