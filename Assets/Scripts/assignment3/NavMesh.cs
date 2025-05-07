@@ -51,67 +51,59 @@ public class NavMesh : MonoBehaviour
         }
     }
 
-    Polygon FindPolygonContainingWall(Wall targetWall, List<Polygon> polygons)
-    {
-        foreach (Polygon polygon in polygons)
-        {
-            foreach (Wall wall in polygon.walls)
-            {
-                if ((wall.start == targetWall.start && wall.end == targetWall.end) || (wall.start == targetWall.end && wall.end == targetWall.start))
-                {
-                    return polygon;
-                }
-            }
-        }
-        Debug.Log("null returned in FindPolygonContainingWall");
-        return null;
-    }
 
     public Graph MakeNavMesh(List<Wall> outline) // We actually can't use a Polygon; Polygons are formed out of the outline lmao
     {
-        List<Wall> reflexAngles = new List<Wall>();
-        
-        for (int i = 0; i < outline.Count; i++) // Finds all reflexive angles and logs them
-        {
-            Wall no1 = outline[i];
-            Wall no2 = outline[(i + 1) % outline.Count];
-            if (Vector3.Dot(no1.normal, no2.direction) < 0)
-            {
-                reflexAngles.Add(no1);
-            }
-        }
-
-        // find the non-convex corner <- done on Friday, see above
-        // find the second split point
-        // split the polygon
-        // build the graph
         List<Polygon> polygons = new List<Polygon>();
-        //Polygon initPolygon = new Polygon(outline);
-        Polygon currPolygon = new Polygon(outline);
+        polygons.Add(new Polygon(outline));
 
-        foreach (Wall rAngle in reflexAngles)
+        bool containsReflexAngle = true;
+
+        while(containsReflexAngle)
         {
-            // iterate through every wall in a polygon using the wall.same method to find which polygon an rAngle belongs to
-            int index = outline.IndexOf(rAngle);
-            if (index > -1)
+            containsReflexAngle = false;
+            List<Polygon> generatedPolygons = new List<Polygon>();
+            foreach (Polygon currentPolygon in polygons)
             {
-                Polygon findPoly = FindPolygonContainingWall(rAngle, polygons);
-                if (findPoly != null) currPolygon = findPoly;
-                index = currPolygon.walls.IndexOf(rAngle);
-                if (index > -1) {
-                    int nextSplitPoint = FindNextSplitPoint(currPolygon, index);
-                    if (nextSplitPoint != -1)
+                List<int> reflexAngleIndices = new List<int>();
+
+                // Decided to localize the reflex angle check to the polygon, and to iterate over them instead of the outline and trying to iterate over them from within it
+                for (int i = 0; i < currentPolygon.walls.Count; i++)
+                {
+                    Wall no1 = currentPolygon.walls[i];
+                    Wall no2 = currentPolygon.walls[(i + 1) % currentPolygon.walls.Count];
+                    if (Vector3.Dot(no1.normal, no2.direction) < 0)
                     {
-                        var (a, b) = currPolygon.SplitPolygon(index, nextSplitPoint, currPolygon.walls);
-                        polygons.Remove(currPolygon);
-                        polygons.Add(a);
-                        polygons.Add(b);
+                        reflexAngleIndices.Add(i);
                     }
                 }
-            }
-        }
 
+                if(reflexAngleIndices.Count > 0)
+                {
+                    containsReflexAngle = true;
+                    int splitPoint = reflexAngleIndices[0];
+                    int nextSplitPoint = FindNextSplitPoint(currentPolygon, splitPoint);
+
+                    if (nextSplitPoint != -1)
+                    {
+                        var (a, b) = currentPolygon.SplitPolygon(splitPoint, nextSplitPoint, currentPolygon.walls);
+                        generatedPolygons.Add(a);
+                        generatedPolygons.Add(b);
+                    }
+                    else
+                    {
+                        generatedPolygons.Add(currentPolygon); // Now, if there is no valid split point, it's actually okay
+                    }
+                }
+                else
+                {
+                    generatedPolygons.Add(currentPolygon); // see above
+                }
+            }
+            polygons = generatedPolygons;
+        }
         Debug.Log($"Finished splitting polygons. Total polygons: {polygons.Count}");
+        
         // build the graph
         List<GraphNode> nodes = new List<GraphNode>();
         int idGenerate = 0; // naive approach
